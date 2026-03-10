@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}My Loans – EMI Framework{% endblock %}
+{% block page_title %}My Loans{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">Loans</li>{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h5 style="font-weight:700;color:#1a3c5e;margin:0;">Loan Portfolio</h5>
+    <p style="color:#6b7280;font-size:.82rem;margin:4px 0 0;">Manage and monitor all your loans</p>
+  </div>
+</div>
+
+<div class="row g-3" id="loans-grid">
+  <div class="col-12 loader"><div class="spinner-border text-primary"></div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadLoans() {
+  try {
+    const loans = await apiGet('/api/loans/');
+    const grid  = document.getElementById('loans-grid');
+    if (!loans.length) {
+      grid.innerHTML = `
+        <div class="col-12" style="text-align:center;padding:60px;color:#9ca3af;">
+          <i class="fas fa-file-invoice-dollar" style="font-size:3rem;display:block;margin-bottom:12px;opacity:.3;"></i>
+          <div style="font-weight:600;">No loans found</div>
+          <div style="font-size:.82rem;">Go to the Dashboard to apply for a loan.</div>
+          <a href="/dashboard" class="btn-primary-custom btn mt-3">Go to Dashboard</a>
+        </div>`;
+      return;
+    }
+
+    grid.innerHTML = loans.map(l => {
+      const pct = l.outstanding_balance && l.loan_amount
+        ? Math.round((1 - l.outstanding_balance / l.loan_amount) * 100) : 0;
+      const statusColor = l.loan_status === 'ACTIVE' ? '#16a34a' : l.loan_status === 'CLOSED' ? '#6b7280' : '#dc2626';
+      return `
+        <div class="col-md-6 col-lg-4">
+          <div class="stat-card" style="cursor:pointer;" onclick="window.location='/loans/${l.id}'">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+              <div>
+                <code style="font-size:.72rem;background:#f0f4f8;padding:3px 8px;border-radius:4px;">${l.loan_number}</code>
+                <div style="font-size:.75rem;color:#6b7280;margin-top:4px;">${l.loan_type} Loan</div>
+              </div>
+              <span class="badge" style="background:${statusColor}20;color:${statusColor};font-size:.7rem;">${l.loan_status}</span>
+            </div>
+            <div style="font-size:1.5rem;font-weight:800;color:#1a3c5e;">${currency(l.loan_amount)}</div>
+            <div style="font-size:.75rem;color:#6b7280;margin-bottom:12px;">
+              ${l.interest_rate}% p.a. &nbsp;•&nbsp; ${l.tenure_months} months
+            </div>
+            <!-- Progress Bar -->
+            <div style="background:#f0f4f8;border-radius:10px;height:6px;margin-bottom:6px;">
+              <div style="background:#2563eb;height:6px;border-radius:10px;width:${pct}%;transition:width .6s;"></div>
+            </div>
+            <div class="d-flex justify-content-between" style="font-size:.72rem;color:#9ca3af;">
+              <span>${pct}% repaid</span>
+              <span>Balance: ${currency(l.outstanding_balance||0)}</span>
+            </div>
+            <div class="d-flex gap-2 mt-3">
+              <a href="/loans/${l.id}" class="btn btn-sm flex-1 text-center"
+                style="background:#eff6ff;color:#2563eb;border-radius:7px;font-size:.75rem;padding:6px;">
+                <i class="fas fa-info-circle me-1"></i>Details
+              </a>
+              <a href="/emi/${l.id}" class="btn btn-sm flex-1 text-center"
+                style="background:#f0fdf4;color:#16a34a;border-radius:7px;font-size:.75rem;padding:6px;">
+                <i class="fas fa-calendar me-1"></i>Schedule
+              </a>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('loans-grid').innerHTML =
+      '<div class="col-12 text-center text-danger py-4">Failed to load loans.</div>';
+  }
+}
+loadLoans();
+</script>
+{% endblock %}

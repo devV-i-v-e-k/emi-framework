@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Loan Detail – EMI Framework{% endblock %}
+{% block page_title %}Loan Details{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="/loans" style="color:#2563eb;">Loans</a></li>
+<li class="breadcrumb-item active">Loan #{{ loan_id }}</li>
+{% endblock %}
+
+{% block content %}
+<div id="loan-detail-content">
+  <div class="loader"><div class="spinner-border text-primary"></div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const LOAN_ID = {{ loan_id }};
+
+async function loadLoanDetail() {
+  try {
+    const l = await apiGet(`/api/loans/${LOAN_ID}`);
+    const s = l.financial_summary || {};
+    const pct = l.outstanding_balance && l.loan_amount
+      ? Math.round((1 - l.outstanding_balance / l.loan_amount) * 100) : 0;
+
+    document.getElementById('loan-detail-content').innerHTML = `
+      <div class="row g-3 mb-4">
+        <!-- Main Info Card -->
+        <div class="col-lg-8">
+          <div class="table-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <span><i class="fas fa-file-invoice-dollar me-2" style="color:#2563eb;"></i>Loan Information</span>
+              <code style="font-size:.8rem;">${l.loan_number}</code>
+            </div>
+            <div style="padding:24px;">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <div style="font-size:.72rem;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.08em;">Loan Type</div>
+                  <div style="font-size:.95rem;font-weight:600;color:#1a3c5e;margin-top:2px;">${l.loan_type}</div>
+                </div>
+                <div class="col-md-6">
+                  <div style="font-size:.72rem;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.08em;">Status</div>
+                  <div style="margin-top:2px;">
+                    <span class="badge ${l.loan_status==='ACTIVE'?'bg-success':'bg-secondary'}">${l.loan_status}</span>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div style="font-size:.72rem;color:#9ca3af;font-weight:600;text-transform:uppercase;">Principal</div>
+                  <div style="font-size:1.2rem;font-weight:700;color:#1a3c5e;">${currency(l.loan_amount)}</div>
+                </div>
+                <div class="col-md-6">
+                  <div style="font-size:.72rem;color:#9ca3af;font-weight:600;text-transform:uppercase;">Outstanding</div>
+                  <div style="font-size:1.2rem;font-weight:700;color:#dc2626;">${currency(l.outstanding_balance||0)}</div>
+                </div>
+                <div class="col-md-4">
+                  <div style="font-size:.72rem;color:#9ca3af;font-weight:600;text-transform:uppercase;">Monthly EMI</div>
+                  <div style="font-size:1rem;font-weight:700;color:#2563eb;">${currency(l.emi_amount)}</div>
+                </div>
+                <div class="col-md-4">
+                  <div style="font-size:.72rem;color:#9ca3af;font-weight:600;text-transform:uppercase;">Rate p.a.</div>
+                  <div style="font-size:1rem;font-weight:700;color:#1a3c5e;">${l.interest_rate}%</div>
+                </div>
+                <div class="col-md-4">
+                  <div style="font-size:.72rem;color:#9ca3af;font-weight:600;text-transform:uppercase;">Tenure</div>
+                  <div style="font-size:1rem;font-weight:700;color:#1a3c5e;">${l.tenure_months} months</div>
+                </div>
+                <div class="col-12">
+                  <div style="font-size:.72rem;color:#9ca3af;font-weight:600;text-transform:uppercase;">Purpose</div>
+                  <div style="font-size:.88rem;color:#374151;margin-top:2px;">${l.purpose||'—'}</div>
+                </div>
+                <div class="col-12">
+                  <div style="background:#f0f4f8;border-radius:10px;height:8px;margin-top:8px;">
+                    <div style="background:linear-gradient(90deg,#2563eb,#0ea5e9);height:8px;border-radius:10px;width:${pct}%;"></div>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;font-size:.72rem;color:#9ca3af;margin-top:4px;">
+                    <span>${pct}% repaid</span>
+                    <span>Disbursed: ${fmtDate(l.disbursement_date)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Financial Summary -->
+        <div class="col-lg-4">
+          <div class="table-card">
+            <div class="card-header"><i class="fas fa-chart-pie me-2" style="color:#2563eb;"></i>Financial Summary</div>
+            <div style="padding:20px;">
+              ${[
+                ['Total Payment', currency(s.total_payment||0), '#1a3c5e'],
+                ['Total Interest', currency(s.total_interest||0), '#dc2626'],
+                ['Interest %', (s.interest_percent||0)+'%', '#d97706'],
+              ].map(([label,val,color])=>`
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0f4f8;">
+                  <span style="font-size:.8rem;color:#6b7280;">${label}</span>
+                  <span style="font-size:.9rem;font-weight:700;color:${color};">${val}</span>
+                </div>`).join('')}
+            </div>
+          </div>
+
+          <div class="table-card mt-3">
+            <div class="card-header"><i class="fas fa-bolt me-2" style="color:#d97706;"></i>Quick Actions</div>
+            <div style="padding:16px;display:flex;flex-direction:column;gap:8px;">
+              <a href="/emi/${LOAN_ID}" class="btn btn-sm" style="background:#eff6ff;color:#2563eb;border-radius:8px;padding:9px;font-size:.82rem;font-weight:600;">
+                <i class="fas fa-calendar-alt me-2"></i>View EMI Schedule
+              </a>
+              <button class="btn btn-sm" style="background:#f0fdf4;color:#16a34a;border-radius:8px;padding:9px;font-size:.82rem;font-weight:600;" onclick="triggerAlerts()">
+                <i class="fas fa-bell me-2"></i>Check & Generate Alerts
+              </button>
+              <a href="/alerts" class="btn btn-sm" style="background:#fff7ed;color:#d97706;border-radius:8px;padding:9px;font-size:.82rem;font-weight:600;">
+                <i class="fas fa-exclamation-circle me-2"></i>View All Alerts
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  } catch(e) {
+    document.getElementById('loan-detail-content').innerHTML =
+      '<div class="text-center text-danger py-5">Failed to load loan details.</div>';
+  }
+}
+
+async function triggerAlerts() {
+  const r = await apiPost(`/api/alerts/trigger/${LOAN_ID}`);
+  if (r.ok) showToast(`✅ ${r.data.message}`);
+  else      showToast('Alert generation failed.', 'error');
+}
+
+loadLoanDetail();
+</script>
+{% endblock %}

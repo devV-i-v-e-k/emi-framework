@@ -1,0 +1,346 @@
+================================================================
+  CLOUD-BASED EMI FAILURE PREVENTION FRAMEWORK
+  AWS DEPLOYMENT GUIDE – Step-by-Step
+  Target: Ubuntu 22.04 LTS EC2 + RDS MySQL 8.x
+================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 1 – CREATE AN AWS ACCOUNT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Go to https://aws.amazon.com → Create a Free Tier account.
+2. Enable MFA on your root account.
+3. Open IAM → create a new user "emi-deploy" with
+   programmatic access and the following managed policies:
+     - AmazonEC2FullAccess
+     - AmazonRDSFullAccess
+     - AmazonS3FullAccess
+     - CloudWatchFullAccess
+4. Download the Access Key ID and Secret Access Key.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 2 – CREATE SECURITY GROUPS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EC2 Security Group (sg-emi-ec2):
+  Inbound Rules:
+    Port 22   (SSH)   – Your IP only (x.x.x.x/32)
+    Port 80   (HTTP)  – 0.0.0.0/0
+    Port 443  (HTTPS) – 0.0.0.0/0
+    Port 5000 (Flask dev, remove in production) – Your IP
+
+RDS Security Group (sg-emi-rds):
+  Inbound Rules:
+    Port 3306 (MySQL) – Source: sg-emi-ec2 (EC2 SG reference)
+    # NEVER expose RDS port to 0.0.0.0/0
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 3 – LAUNCH EC2 INSTANCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. EC2 Console → Launch Instance
+   - Name: emi-framework-server
+   - AMI: Ubuntu Server 22.04 LTS (Free Tier eligible)
+   - Instance Type: t3.small (2 vCPU, 2GB RAM) [production]
+                    t2.micro (Free Tier)        [testing only]
+   - Key Pair: Create new → emi-keypair.pem
+   - Security Group: sg-emi-ec2
+   - Storage: 20 GB gp3
+
+2. Allocate & associate an Elastic IP to the instance.
+
+3. Download emi-keypair.pem and set permissions:
+   chmod 400 emi-keypair.pem
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 4 – SETUP RDS MYSQL INSTANCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. RDS Console → Create Database
+   - Engine: MySQL 8.0
+   - Template: Free Tier (or Dev/Test)
+   - DB identifier: emi-framework-db
+   - Master username: emi_admin
+   - Master password: <strong-password>
+   - Instance: db.t3.micro
+   - Storage: 20 GB gp2, enable auto-scaling
+   - VPC: same as EC2
+   - Security Group: sg-emi-rds
+   - Public Access: NO
+   - Monitoring: Enable Enhanced Monitoring
+
+2. After creation note the RDS Endpoint:
+   e.g. emi-framework-db.xxxxxxxx.us-east-1.rds.amazonaws.com
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 5 – CONFIGURE EC2 SERVER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SSH into EC2:
+  ssh -i emi-keypair.pem ubuntu@<ELASTIC-IP>
+
+# Update system packages
+sudo apt-get update && sudo apt-get upgrade -y
+
+# Install Python 3.11, pip, virtualenv
+sudo apt-get install -y python3.11 python3-pip python3-venv git \
+     nginx mysql-client certbot python3-certbot-nginx
+
+# Install Node.js (optional, for build tools)
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Create application directory
+sudo mkdir -p /opt/emi-framework
+sudo chown ubuntu:ubuntu /opt/emi-framework
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 6 – DEPLOY APPLICATION CODE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Clone or SCP your project
+cd /opt/emi-framework
+git clone https://github.com/<your-repo>/emi-framework.git .
+# OR use SCP:
+# scp -i emi-keypair.pem -r ./emi_framework ubuntu@<IP>:/opt/emi-framework
+
+# Create Python virtual environment
+python3.11 -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+cd backend
+pip install --upgrade pip
+pip install -r requirements.txt
+
+# Set up environment file
+cp ../.env.example ../.env
+nano ../.env   # Fill in DB_HOST (RDS endpoint), passwords, SECRET_KEY
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 7 – INITIALISE THE DATABASE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Connect to RDS from EC2 (MySQL client must be installed)
+mysql -h <RDS-ENDPOINT> -u emi_admin -p
+
+# In the MySQL prompt:
+CREATE USER 'emi_user'@'%' IDENTIFIED BY 'emi_password';
+GRANT ALL PRIVILEGES ON emi_framework.* TO 'emi_user'@'%';
+FLUSH PRIVILEGES;
+EXIT;
+
+# Apply schema
+mysql -h <RDS-ENDPOINT> -u emi_admin -p < /opt/emi-framework/database/schema.sql
+
+# Register test users via API (after app starts) OR:
+# Use the /api/auth/register endpoint from the login page.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 8 – CONFIGURE SYSTEMD SERVICE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+sudo tee /etc/systemd/system/emi-framework.service << 'EOF'
+[Unit]
+Description=EMI Failure Prevention Framework (Gunicorn)
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/opt/emi-framework/backend
+EnvironmentFile=/opt/emi-framework/.env
+ExecStart=/opt/emi-framework/venv/bin/gunicorn \
+          -c gunicorn.conf.py app:app
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable  emi-framework
+sudo systemctl start   emi-framework
+sudo systemctl status  emi-framework
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 9 – CONFIGURE NGINX REVERSE PROXY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+sudo tee /etc/nginx/sites-available/emi-framework << 'EOF'
+server {
+    listen 80;
+    server_name <YOUR-DOMAIN-OR-ELASTIC-IP>;
+
+    # Security headers
+    add_header X-Frame-Options        "SAMEORIGIN"   always;
+    add_header X-XSS-Protection       "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff"       always;
+
+    client_max_body_size 10M;
+
+    location / {
+        proxy_pass         http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 60s;
+        proxy_read_timeout    120s;
+    }
+}
+EOF
+
+sudo ln -sf /etc/nginx/sites-available/emi-framework \
+            /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 10 – HTTPS WITH LET'S ENCRYPT (CERTBOT)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Requires a domain name pointed at your Elastic IP
+sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
+
+# Auto-renewal (runs twice daily via systemd timer)
+sudo systemctl enable  certbot.timer
+sudo systemctl status  certbot.timer
+
+# In .env: update SESSION_COOKIE_SECURE=True when HTTPS is live
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 11 – SETUP S3 FOR DATABASE BACKUPS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Create S3 bucket
+aws s3 mb s3://emi-framework-backups --region us-east-1
+
+# Enable versioning
+aws s3api put-bucket-versioning \
+    --bucket emi-framework-backups \
+    --versioning-configuration Status=Enabled
+
+# Backup script: /opt/emi-framework/scripts/backup.sh
+tee /opt/emi-framework/scripts/backup.sh << 'SCRIPT'
+#!/bin/bash
+DATE=$(date +%Y%m%d_%H%M%S)
+BACKUP_FILE="/tmp/emi_backup_${DATE}.sql.gz"
+mysqldump -h $DB_HOST -u $DB_USER -p$DB_PASSWORD $DB_NAME | gzip > $BACKUP_FILE
+aws s3 cp $BACKUP_FILE s3://emi-framework-backups/backups/
+rm -f $BACKUP_FILE
+echo "Backup $BACKUP_FILE uploaded successfully."
+SCRIPT
+chmod +x /opt/emi-framework/scripts/backup.sh
+
+# Cron: daily backup at 2 AM
+(crontab -l 2>/dev/null; echo "0 2 * * * /opt/emi-framework/scripts/backup.sh") | crontab -
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 12 – CONFIGURE CLOUDWATCH MONITORING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Install CloudWatch Agent on EC2
+wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+sudo dpkg -i amazon-cloudwatch-agent.deb
+
+# CloudWatch Agent Config
+sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json << 'EOF'
+{
+  "agent": { "run_as_user": "cwagent" },
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/opt/emi-framework/backend/app.log",
+            "log_group_name": "/emi-framework/application",
+            "log_stream_name": "{instance_id}",
+            "timezone": "UTC"
+          }
+        ]
+      }
+    }
+  },
+  "metrics": {
+    "metrics_collected": {
+      "cpu":  { "measurement": ["cpu_usage_idle","cpu_usage_user"] },
+      "mem":  { "measurement": ["mem_used_percent"] },
+      "disk": { "measurement": ["disk_used_percent"] }
+    }
+  }
+}
+EOF
+
+sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+    -a fetch-config -m ec2 \
+    -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s
+
+# RDS Enhanced Monitoring is enabled by default when set up in Step 4
+# Add CloudWatch Alarms:
+aws cloudwatch put-metric-alarm \
+    --alarm-name "EMI-HighCPU" \
+    --metric-name CPUUtilization \
+    --namespace AWS/EC2 \
+    --statistic Average \
+    --period 300 \
+    --threshold 80 \
+    --comparison-operator GreaterThanThreshold \
+    --dimensions Name=InstanceId,Value=<INSTANCE-ID> \
+    --evaluation-periods 2 \
+    --alarm-actions <SNS-TOPIC-ARN>
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 13 – IAM ROLES & SECURITY BEST PRACTICES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Create EC2 IAM Role (preferred over user keys on EC2)
+1. IAM → Roles → Create Role → AWS Service → EC2
+2. Attach policies:
+   - CloudWatchAgentServerPolicy
+   - AmazonS3FullAccess (scoped to backup bucket)
+3. Attach role to EC2 instance (Instance → Actions → Security)
+
+# Scope S3 policy (least privilege)
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": ["s3:PutObject","s3:GetObject","s3:ListBucket"],
+    "Resource": [
+      "arn:aws:s3:::emi-framework-backups",
+      "arn:aws:s3:::emi-framework-backups/*"
+    ]
+  }]
+}
+
+# RDS: Always keep Multi-AZ enabled in production for HA
+# RDS: Enable automated backups (7-day retention minimum)
+# RDS: Enable encryption at rest (AES-256)
+# RDS: Use SSL/TLS for connections (force_ssl parameter = 1)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+QUICK REFERENCE COMMANDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Start / stop / restart application
+sudo systemctl start   emi-framework
+sudo systemctl stop    emi-framework
+sudo systemctl restart emi-framework
+
+# View live application logs
+sudo journalctl -u emi-framework -f
+
+# View Nginx logs
+sudo tail -f /var/log/nginx/access.log
+sudo tail -f /var/log/nginx/error.log
+
+# Database backup now
+/opt/emi-framework/scripts/backup.sh
+
+# List S3 backups
+aws s3 ls s3://emi-framework-backups/backups/
+
+# Verify application is running
+curl -s http://localhost:5000/api/auth/me

@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% block title %}Dashboard – EMI Framework{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Welcome Banner -->
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h4 style="font-weight:700;color:#1a3c5e;margin:0;">Good day, {{ customer_name }}! 👋</h4>
+    <p style="color:#6b7280;font-size:.85rem;margin:4px 0 0;">Here's your EMI health overview</p>
+  </div>
+  <button class="btn-primary-custom btn" onclick="addLoanModal()">
+    <i class="fas fa-plus me-2"></i>New Loan
+  </button>
+</div>
+
+<!-- Stat Cards -->
+<div class="row g-3 mb-4" id="stats-row">
+  <div class="col-md-3 col-sm-6">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#eff6ff;"><i class="fas fa-layer-group" style="color:#2563eb;"></i></div>
+      <div class="stat-value" id="stat-loans">–</div>
+      <div class="stat-label">Active Loans</div>
+    </div>
+  </div>
+  <div class="col-md-3 col-sm-6">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#f0fdf4;"><i class="fas fa-rupee-sign" style="color:#16a34a;"></i></div>
+      <div class="stat-value" id="stat-outstanding">–</div>
+      <div class="stat-label">Total Outstanding</div>
+    </div>
+  </div>
+  <div class="col-md-3 col-sm-6">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#fef9c3;"><i class="fas fa-exclamation-triangle" style="color:#d97706;"></i></div>
+      <div class="stat-value" id="stat-warning">–</div>
+      <div class="stat-label">Warning EMIs</div>
+    </div>
+  </div>
+  <div class="col-md-3 col-sm-6">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#fee2e2;"><i class="fas fa-times-circle" style="color:#dc2626;"></i></div>
+      <div class="stat-value" id="stat-critical">–</div>
+      <div class="stat-label">Critical EMIs</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <!-- Loans Table -->
+  <div class="col-lg-8">
+    <div class="table-card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="fas fa-hand-holding-usd me-2 text-primary"></i>My Loans</span>
+        <a href="/loans" style="font-size:.78rem;color:#2563eb;">View All →</a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Loan #</th><th>Amount</th><th>EMI</th><th>Status</th><th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="loans-tbody">
+            <tr><td colspan="5" class="loader"><div class="spinner-border text-primary"></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Alerts -->
+  <div class="col-lg-4">
+    <div class="table-card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="fas fa-bell me-2 text-warning"></i>Recent Alerts</span>
+        <a href="/alerts" style="font-size:.78rem;color:#2563eb;">All →</a>
+      </div>
+      <div style="padding:14px;" id="alerts-panel">
+        <div class="loader"><div class="spinner-border text-primary"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Risk Summary Chart (simple bar visualization) -->
+<div class="row g-3 mt-1">
+  <div class="col-12">
+    <div class="table-card">
+      <div class="card-header">
+        <i class="fas fa-chart-bar me-2" style="color:#2563eb;"></i>EMI Risk Distribution
+      </div>
+      <div style="padding:20px 24px;" id="risk-chart">
+        <div class="loader"><div class="spinner-border text-primary"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Loan Modal -->
+<div class="modal fade" id="loanModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content" style="border-radius:16px;border:none;">
+      <div class="modal-header" style="border-bottom:1px solid #f0f4f8;padding:20px 24px;">
+        <h5 class="modal-title" style="font-weight:700;color:#1a3c5e;">Apply for a Loan</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:24px;">
+        <div class="mb-3">
+          <label class="form-label" style="font-size:.8rem;font-weight:600;">Loan Type</label>
+          <select id="loan-type" class="form-control">
+            <option value="HOME">Home Loan</option>
+            <option value="CAR">Car Loan</option>
+            <option value="PERSONAL">Personal Loan</option>
+            <option value="EDUCATION">Education Loan</option>
+            <option value="BUSINESS">Business Loan</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" style="font-size:.8rem;font-weight:600;">Principal Amount (₹)</label>
+          <input type="number" id="loan-amount" class="form-control" placeholder="500000" min="1000"/>
+        </div>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label" style="font-size:.8rem;font-weight:600;">Annual Interest Rate (%)</label>
+            <input type="number" id="loan-rate" class="form-control" placeholder="10.5" step="0.1"/>
+          </div>
+          <div class="col-6">
+            <label class="form-label" style="font-size:.8rem;font-weight:600;">Tenure (Months)</label>
+            <input type="number" id="loan-tenure" class="form-control" placeholder="36"/>
+          </div>
+        </div>
+        <div class="mb-3 mt-2">
+          <label class="form-label" style="font-size:.8rem;font-weight:600;">Purpose</label>
+          <input type="text" id="loan-purpose" class="form-control" placeholder="Brief description"/>
+        </div>
+        <div id="emi-preview" style="background:#f0f9ff;border-radius:10px;padding:14px;display:none;">
+          <div style="font-size:.75rem;color:#0ea5e9;font-weight:700;margin-bottom:6px;">EMI PREVIEW</div>
+          <div id="emi-preview-val" style="font-size:1.4rem;font-weight:800;color:#1a3c5e;"></div>
+          <div id="emi-preview-detail" style="font-size:.75rem;color:#6b7280;margin-top:4px;"></div>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid #f0f4f8;padding:16px 24px;">
+        <button class="btn-outline-custom btn me-2" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-custom btn" onclick="submitLoan()">Apply Now</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CUSTOMER_ID = {{ customer_id }};
+
+async function loadDashboard() {
+  try {
+    const d = await apiGet(`/api/customers/${CUSTOMER_ID}/dashboard`);
+
+    document.getElementById('stat-loans').textContent       = d.active_loans;
+    document.getElementById('stat-outstanding').textContent = '₹' + parseFloat(d.total_outstanding).toLocaleString('en-IN');
+    document.getElementById('stat-warning').textContent     = d.risk_summary.WARNING || 0;
+    document.getElementById('stat-critical').textContent    = d.risk_summary.CRITICAL || 0;
+
+    // Loans table
+    const tbody = document.getElementById('loans-tbody');
+    if (!d.loans.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No loans found. Apply for your first loan!</td></tr>';
+    } else {
+      tbody.innerHTML = d.loans.slice(0,6).map(l => `
+        <tr>
+          <td><code style="font-size:.8rem;">${l.loan_number}</code></td>
+          <td>${currency(l.loan_amount)}</td>
+          <td>${currency(l.loan_amount * parseFloat(l.interest_rate||0) / 1200 / (1 - Math.pow(1 + parseFloat(l.interest_rate||0)/1200, -parseInt(l.tenure_months))))}</td>
+          <td><span class="badge ${l.loan_status==='ACTIVE'?'bg-success':'bg-secondary'}">${l.loan_status}</span></td>
+          <td>
+            <a href="/loans/${l.id}" class="btn btn-sm" style="background:#eff6ff;color:#2563eb;border-radius:6px;font-size:.75rem;padding:4px 10px;">View</a>
+          </td>
+        </tr>`).join('');
+    }
+
+    // Alerts panel
+    const ap = document.getElementById('alerts-panel');
+    if (!d.recent_alerts.length) {
+      ap.innerHTML = '<div style="text-align:center;padding:20px;color:#9ca3af;font-size:.82rem;"><i class="fas fa-bell-slash mb-2 d-block" style="font-size:1.5rem;"></i>No recent alerts</div>';
+    } else {
+      ap.innerHTML = d.recent_alerts.map(a => `
+        <div class="alert-item ${a.alert_type.toLowerCase()}">
+          <div class="alert-type">${a.alert_type}</div>
+          <div style="font-size:.8rem;color:#374151;margin-top:4px;">${a.message.substring(0,90)}…</div>
+          <div style="font-size:.7rem;color:#9ca3af;margin-top:4px;">${fmtDate(a.created_at)}</div>
+        </div>`).join('');
+    }
+
+    // Risk chart
+    const rs = d.risk_summary;
+    const total = (rs.SAFE||0) + (rs.WARNING||0) + (rs.CRITICAL||0) + (rs.PAID||0);
+    const riskChart = document.getElementById('risk-chart');
+    if (total === 0) {
+      riskChart.innerHTML = '<div style="text-align:center;color:#9ca3af;font-size:.85rem;padding:16px;">No EMI data available yet.</div>';
+    } else {
+      const bars = [
+        {label:'PAID',     count:rs.PAID||0,     color:'#7c3aed', bg:'#ede9fe'},
+        {label:'SAFE',     count:rs.SAFE||0,     color:'#16a34a', bg:'#dcfce7'},
+        {label:'WARNING',  count:rs.WARNING||0,  color:'#d97706', bg:'#fef3c7'},
+        {label:'CRITICAL', count:rs.CRITICAL||0, color:'#dc2626', bg:'#fee2e2'},
+      ].map(b => `
+        <div class="col-md-3 col-6">
+          <div style="background:${b.bg};border-radius:12px;padding:16px;text-align:center;">
+            <div style="font-size:1.8rem;font-weight:800;color:${b.color};">${b.count}</div>
+            <div style="font-size:.72rem;font-weight:700;color:${b.color};letter-spacing:.08em;">${b.label}</div>
+            <div style="font-size:.68rem;color:#9ca3af;margin-top:2px;">${total?Math.round(b.count/total*100):0}%</div>
+          </div>
+        </div>`).join('');
+      riskChart.innerHTML = `<div class="row g-2">${bars}</div>`;
+    }
+  } catch(e) {
+    console.error('Dashboard load error:', e);
+  }
+}
+
+function addLoanModal() {
+  new bootstrap.Modal(document.getElementById('loanModal')).show();
+}
+
+document.querySelectorAll('#loan-amount,#loan-rate,#loan-tenure').forEach(el => {
+  el.addEventListener('input', previewEMI);
+});
+
+async function previewEMI() {
+  const p = parseFloat(document.getElementById('loan-amount').value);
+  const r = parseFloat(document.getElementById('loan-rate').value);
+  const n = parseInt(document.getElementById('loan-tenure').value);
+  const preview = document.getElementById('emi-preview');
+  if (p > 0 && r >= 0 && n > 0) {
+    try {
+      const d = await apiGet(`/api/emi/calculate?principal=${p}&annual_rate=${r}&tenure_months=${n}`);
+      preview.style.display = 'block';
+      document.getElementById('emi-preview-val').textContent = currency(d.emi_amount) + ' / month';
+      document.getElementById('emi-preview-detail').textContent =
+        `Total Payment: ${currency(d.total_payment)} | Interest: ${currency(d.total_interest)} (${d.interest_percent}%)`;
+    } catch(e) {}
+  } else {
+    preview.style.display = 'none';
+  }
+}
+
+async function submitLoan() {
+  const body = {
+    loan_type     : document.getElementById('loan-type').value,
+    loan_amount   : parseFloat(document.getElementById('loan-amount').value),
+    interest_rate : parseFloat(document.getElementById('loan-rate').value),
+    tenure_months : parseInt(document.getElementById('loan-tenure').value),
+    purpose       : document.getElementById('loan-purpose').value
+  };
+  if (!body.loan_amount || !body.interest_rate || !body.tenure_months) {
+    showToast('Please fill in all loan fields.', 'error'); return;
+  }
+  const r = await apiPost('/api/loans/', body);
+  if (r.ok) {
+    bootstrap.Modal.getInstance(document.getElementById('loanModal')).hide();
+    showToast(`✅ Loan created! EMI: ${currency(r.data.emi_amount)}/month`);
+    loadDashboard();
+  } else {
+    showToast(r.data.error || 'Loan creation failed.', 'error');
+  }
+}
+
+loadDashboard();
+</script>
+{% endblock %}

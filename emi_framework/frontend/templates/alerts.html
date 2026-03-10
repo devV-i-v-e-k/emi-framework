@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Alerts – EMI Framework{% endblock %}
+{% block page_title %}Alert Centre{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item active">Alerts</li>
+{% endblock %}
+
+{% block content %}
+<!-- Summary Badges -->
+<div class="row g-3 mb-4">
+  <div class="col-md-4 col-sm-12">
+    <div class="stat-card" style="border-left:4px solid #dc2626;">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <div class="stat-value" id="cnt-critical" style="color:#dc2626;">–</div>
+          <div class="stat-label">Critical Alerts</div>
+        </div>
+        <div class="stat-icon" style="background:#fee2e2;">
+          <i class="fas fa-times-circle" style="color:#dc2626;"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4 col-sm-12">
+    <div class="stat-card" style="border-left:4px solid #d97706;">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <div class="stat-value" id="cnt-warning" style="color:#d97706;">–</div>
+          <div class="stat-label">Warning Alerts</div>
+        </div>
+        <div class="stat-icon" style="background:#fef3c7;">
+          <i class="fas fa-exclamation-triangle" style="color:#d97706;"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4 col-sm-12">
+    <div class="stat-card" style="border-left:4px solid #16a34a;">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <div class="stat-value" id="cnt-safe" style="color:#16a34a;">–</div>
+          <div class="stat-label">Informational</div>
+        </div>
+        <div class="stat-icon" style="background:#dcfce7;">
+          <i class="fas fa-check-circle" style="color:#16a34a;"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Filter + Mark All Read -->
+<div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
+  <select id="filter-type" class="form-select form-select-sm" style="width:auto;" onchange="applyFilter()">
+    <option value="">All Types</option>
+    <option value="CRITICAL">Critical</option>
+    <option value="WARNING">Warning</option>
+    <option value="SAFE">Safe</option>
+  </select>
+  <button class="btn btn-sm btn-outline-secondary" onclick="markAllRead()">
+    <i class="fas fa-check-double me-1"></i>Mark All Read
+  </button>
+  <span style="color:#9ca3af;font-size:.78rem;margin-left:auto;" id="alert-count-label"></span>
+</div>
+
+<!-- Alerts List -->
+<div id="alerts-list">
+  <div class="loader"><div class="spinner-border text-primary"></div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allAlerts = [];
+
+async function loadAlerts() {
+  try {
+    const [alerts, summary] = await Promise.all([
+      apiGet('/api/alerts/'),
+      apiGet('/api/alerts/summary')
+    ]);
+    allAlerts = alerts;
+    document.getElementById('cnt-critical').textContent = summary.CRITICAL || 0;
+    document.getElementById('cnt-warning').textContent  = summary.WARNING  || 0;
+    document.getElementById('cnt-safe').textContent     = summary.SAFE     || 0;
+    renderAlerts(allAlerts);
+  } catch(e) {
+    document.getElementById('alerts-list').innerHTML =
+      '<div class="text-center text-danger py-4">Failed to load alerts.</div>';
+  }
+}
+
+function renderAlerts(alerts) {
+  document.getElementById('alert-count-label').textContent = `${alerts.length} alert(s)`;
+  const el = document.getElementById('alerts-list');
+  if (!alerts.length) {
+    el.innerHTML = `
+      <div style="text-align:center;padding:60px;color:#9ca3af;">
+        <i class="fas fa-bell-slash" style="font-size:3rem;margin-bottom:16px;display:block;opacity:.3;"></i>
+        <div style="font-weight:600;">No alerts to display</div>
+        <div style="font-size:.82rem;">You're all clear! No risk alerts at this time.</div>
+      </div>`;
+    return;
+  }
+  el.innerHTML = alerts.map(a => {
+    const cls = a.alert_type === 'CRITICAL' ? 'critical' : a.alert_type === 'WARNING' ? 'warning' : 'safe';
+    const icon= a.alert_type === 'CRITICAL' ? 'times-circle' : a.alert_type === 'WARNING' ? 'exclamation-triangle' : 'check-circle';
+    return `
+      <div class="alert-item ${cls}" id="alert-${a.id}">
+        <div class="d-flex align-items-start justify-content-between">
+          <div class="d-flex align-items-start gap-10">
+            <i class="fas fa-${icon} mt-1 me-2" style="font-size:1rem;opacity:.8;"></i>
+            <div>
+              <div class="alert-type">${a.alert_type}</div>
+              <div style="font-size:.85rem;color:#374151;margin-top:4px;">${a.message}</div>
+              <div style="font-size:.72rem;color:#9ca3af;margin-top:6px;">
+                <i class="fas fa-file-invoice-dollar me-1"></i>${a.loan_number || ''}
+                &nbsp;•&nbsp;
+                <i class="fas fa-clock me-1"></i>${fmtDate(a.created_at)}
+                ${a.due_date ? ` &nbsp;•&nbsp; <i class="fas fa-calendar me-1"></i>Due: ${fmtDate(a.due_date)}` : ''}
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-sm" style="background:#f3f4f6;border:none;border-radius:6px;font-size:.72rem;white-space:nowrap;"
+            onclick="markRead(${a.id})">
+            <i class="fas fa-check me-1"></i>Read
+          </button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function applyFilter() {
+  const v = document.getElementById('filter-type').value;
+  renderAlerts(v ? allAlerts.filter(a => a.alert_type === v) : allAlerts);
+}
+
+async function markRead(alertId) {
+  const r = await apiPut(`/api/alerts/${alertId}/read`);
+  if (r.ok) {
+    const el = document.getElementById(`alert-${alertId}`);
+    if (el) { el.style.opacity = '.45'; el.style.pointerEvents = 'none'; }
+    showToast('Alert marked as read.');
+  }
+}
+
+async function markAllRead() {
+  const visible = allAlerts.filter(a => {
+    const f = document.getElementById('filter-type').value;
+    return !f || a.alert_type === f;
+  });
+  for (const a of visible) { await markRead(a.id); }
+  showToast('All alerts marked as read.');
+}
+
+loadAlerts();
+</script>
+{% endblock %}

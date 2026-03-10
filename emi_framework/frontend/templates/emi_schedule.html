@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}EMI Schedule – Loan {{ loan_id }}{% endblock %}
+{% block page_title %}EMI Schedule{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="/loans" style="color:#2563eb;">Loans</a></li>
+<li class="breadcrumb-item active">EMI Schedule #{{ loan_id }}</li>
+{% endblock %}
+
+{% block content %}
+<!-- Summary Cards -->
+<div class="row g-3 mb-4" id="schedule-stats">
+  <div class="col-md-3 col-6">
+    <div class="stat-card text-center">
+      <div class="stat-value" id="s-total" style="font-size:1.4rem;">–</div>
+      <div class="stat-label">Total Instalments</div>
+    </div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="stat-card text-center">
+      <div class="stat-value" id="s-paid" style="font-size:1.4rem;color:#7c3aed;">–</div>
+      <div class="stat-label">Paid</div>
+    </div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="stat-card text-center">
+      <div class="stat-value" id="s-warning" style="font-size:1.4rem;color:#d97706;">–</div>
+      <div class="stat-label">Warning</div>
+    </div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="stat-card text-center">
+      <div class="stat-value" id="s-critical" style="font-size:1.4rem;color:#dc2626;">–</div>
+      <div class="stat-label">Critical</div>
+    </div>
+  </div>
+</div>
+
+<!-- Controls -->
+<div class="d-flex gap-2 mb-3 flex-wrap">
+  <button class="btn-primary-custom btn btn-sm" onclick="refreshRisk()">
+    <i class="fas fa-sync-alt me-1"></i>Refresh Risk Levels
+  </button>
+  <select id="filter-risk" class="form-select form-select-sm" style="width:auto;" onchange="applyFilter()">
+    <option value="">All Instalments</option>
+    <option value="CRITICAL">Critical Only</option>
+    <option value="WARNING">Warning Only</option>
+    <option value="SAFE">Safe Only</option>
+    <option value="PAID">Paid Only</option>
+  </select>
+</div>
+
+<!-- Schedule Table -->
+<div class="table-card">
+  <div class="card-header">
+    <i class="fas fa-calendar-alt me-2" style="color:#2563eb;"></i>
+    Full Amortisation Schedule – Loan #{{ loan_id }}
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Due Date</th>
+          <th>EMI Amount</th>
+          <th>Principal</th>
+          <th>Interest</th>
+          <th>Balance</th>
+          <th>Risk Level</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="schedule-tbody">
+        <tr><td colspan="9" class="loader"><div class="spinner-border text-primary"></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Pay Modal -->
+<div class="modal fade" id="payModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content" style="border-radius:14px;border:none;">
+      <div class="modal-header" style="border-bottom:1px solid #f0f4f8;padding:18px 20px;">
+        <h6 class="modal-title" style="font-weight:700;color:#1a3c5e;">Record Payment</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:20px;">
+        <p style="font-size:.82rem;color:#6b7280;">Instalment <strong id="pay-inst-no"></strong></p>
+        <div class="mb-3">
+          <label class="form-label" style="font-size:.78rem;font-weight:600;">Amount Paid (₹)</label>
+          <input type="number" id="pay-amount" class="form-control"/>
+        </div>
+        <div class="mb-2">
+          <label class="form-label" style="font-size:.78rem;font-weight:600;">Payment Method</label>
+          <select id="pay-method" class="form-control">
+            <option value="ONLINE">Online Transfer</option>
+            <option value="CHEQUE">Cheque</option>
+            <option value="CASH">Cash</option>
+            <option value="AUTO_DEBIT">Auto Debit</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid #f0f4f8;padding:14px 20px;">
+        <button class="btn-outline-custom btn me-2 btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-custom btn btn-sm" onclick="submitPayment()">Confirm Payment</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const LOAN_ID = {{ loan_id }};
+let allRows = [];
+let currentEmiId = null;
+
+async function loadSchedule() {
+  try {
+    const d = await apiGet(`/api/emi/loan/${LOAN_ID}`);
+    allRows = d.schedule || [];
+
+    document.getElementById('s-total').textContent    = d.summary.total;
+    document.getElementById('s-paid').textContent     = d.summary.paid;
+    document.getElementById('s-warning').textContent  = d.summary.warning;
+    document.getElementById('s-critical').textContent = d.summary.critical;
+
+    renderTable(allRows);
+  } catch(e) {
+    document.getElementById('schedule-tbody').innerHTML =
+      '<tr><td colspan="9" class="text-center text-danger py-4">Failed to load schedule.</td></tr>';
+  }
+}
+
+function renderTable(rows) {
+  const tbody = document.getElementById('schedule-tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No records found.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => {
+    const isPaid = r.status === 'PAID';
+    const risk   = isPaid ? 'PAID' : r.risk_level;
+    const rowCls = risk === 'CRITICAL' ? 'table-danger' : risk === 'WARNING' ? 'table-warning' : '';
+    return `
+      <tr class="${rowCls}">
+        <td><strong>${r.installment_number}</strong></td>
+        <td>${fmtDate(r.due_date)}</td>
+        <td>${currency(r.emi_amount)}</td>
+        <td style="font-size:.8rem;">${currency(r.principal_component)}</td>
+        <td style="font-size:.8rem;">${currency(r.interest_component)}</td>
+        <td style="font-size:.8rem;">${currency(r.outstanding_balance)}</td>
+        <td>${riskBadge(risk)}</td>
+        <td><span class="badge ${isPaid?'bg-success':'bg-light text-dark'}" style="font-size:.72rem;">${r.status}</span></td>
+        <td>
+          ${!isPaid ? `<button class="btn btn-sm" style="background:#eff6ff;color:#2563eb;border-radius:6px;font-size:.72rem;padding:3px 10px;" onclick="openPayModal(${r.id},${r.installment_number},${r.emi_amount})">Pay</button>` : '<span style="color:#9ca3af;font-size:.75rem;">Paid ✓</span>'}
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+function applyFilter() {
+  const v = document.getElementById('filter-risk').value;
+  if (!v) { renderTable(allRows); return; }
+  const filtered = allRows.filter(r => {
+    if (v === 'PAID') return r.status === 'PAID';
+    return r.risk_level === v && r.status !== 'PAID';
+  });
+  renderTable(filtered);
+}
+
+function openPayModal(emiId, instNo, amount) {
+  currentEmiId = emiId;
+  document.getElementById('pay-inst-no').textContent = instNo;
+  document.getElementById('pay-amount').value        = amount;
+  new bootstrap.Modal(document.getElementById('payModal')).show();
+}
+
+async function submitPayment() {
+  const r = await apiPost(`/api/emi/${currentEmiId}/pay`, {
+    amount_paid    : parseFloat(document.getElementById('pay-amount').value),
+    payment_method : document.getElementById('pay-method').value
+  });
+  bootstrap.Modal.getInstance(document.getElementById('payModal')).hide();
+  if (r.ok) { showToast('✅ Payment recorded successfully!'); loadSchedule(); }
+  else       { showToast(r.data.error || 'Payment failed.', 'error'); }
+}
+
+async function refreshRisk() {
+  showToast('⏳ Refreshing risk levels…', 'warning');
+  const r = await apiPost(`/api/emi/loan/${LOAN_ID}/refresh`);
+  if (r.ok) {
+    showToast(`✅ ${r.data.updated_count} risk(s) updated. ${r.data.alerts_created} alert(s) created.`);
+    loadSchedule();
+  } else {
+    showToast('Refresh failed.', 'error');
+  }
+}
+
+loadSchedule();
+</script>
+{% endblock %}

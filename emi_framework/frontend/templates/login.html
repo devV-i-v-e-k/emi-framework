@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login – EMI Prevention Framework</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    body {
+      background: linear-gradient(135deg, #1a3c5e 0%, #0f2540 40%, #1e3a5f 100%);
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    }
+    .login-container {
+      display: grid; grid-template-columns: 1fr 1fr;
+      background: #fff; border-radius: 20px;
+      box-shadow: 0 25px 60px rgba(0,0,0,.4);
+      overflow: hidden; max-width: 900px; width: 92%;
+    }
+    .login-hero {
+      background: linear-gradient(160deg, #1a3c5e 0%, #2563eb 100%);
+      padding: 48px 40px; display: flex; flex-direction: column;
+      justify-content: space-between; color: #fff;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2);
+      border-radius: 30px; padding: 6px 14px; font-size: .72rem; font-weight: 600;
+    }
+    .hero-title { font-size: 2rem; font-weight: 800; line-height: 1.2; margin: 24px 0 12px; }
+    .hero-sub   { font-size: .88rem; opacity: .8; line-height: 1.6; }
+    .feature-item {
+      display: flex; align-items: center; gap: 10px;
+      font-size: .8rem; opacity: .85; margin-top: 10px;
+    }
+    .feature-item i { font-size: .75rem; opacity: .7; }
+    .login-form-side { padding: 48px 40px; }
+    .login-form-side h4 { font-size: 1.4rem; font-weight: 700; color: #1a3c5e; }
+    .login-form-side p.sub  { color: #6b7280; font-size: .85rem; margin-bottom: 28px; }
+    .form-label { font-size: .8rem; font-weight: 600; color: #374151; margin-bottom: 5px; }
+    .form-control {
+      border-radius: 8px; border: 1px solid #d1d5db; font-size: .875rem;
+      padding: 10px 14px; transition: border-color .2s, box-shadow .2s;
+    }
+    .form-control:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+    .input-group-text { background: #f9fafb; border-color: #d1d5db; color: #6b7280; }
+    .btn-login {
+      background: #2563eb; border: none; color: #fff;
+      border-radius: 8px; padding: 11px; font-weight: 600;
+      font-size: .9rem; width: 100%; transition: all .2s;
+    }
+    .btn-login:hover { background: #1d4ed8; transform: translateY(-1px); }
+    .tab-btn {
+      flex: 1; border: none; background: #f3f4f6; padding: 10px;
+      font-size: .8rem; font-weight: 600; cursor: pointer; transition: all .2s;
+    }
+    .tab-btn.active { background: #2563eb; color: #fff; }
+    .tab-btn:first-child { border-radius: 8px 0 0 8px; }
+    .tab-btn:last-child  { border-radius: 0 8px 8px 0; }
+    .error-msg { color: #dc2626; font-size: .8rem; margin-top: 8px; display: none; }
+    @media (max-width: 640px) {
+      .login-container { grid-template-columns: 1fr; }
+      .login-hero { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div class="login-container">
+
+  <!-- Hero Panel -->
+  <div class="login-hero">
+    <div>
+      <div class="hero-badge">
+        <i class="fas fa-shield-alt"></i> Cloud-Native Platform
+      </div>
+      <h2 class="hero-title">EMI Failure Prevention Framework</h2>
+      <p class="hero-sub">Intelligent monitoring, risk detection, and automated alerts to keep your loan repayments on track.</p>
+    </div>
+    <div>
+      <div class="feature-item"><i class="fas fa-circle-check"></i> Real-time EMI Risk Monitoring</div>
+      <div class="feature-item"><i class="fas fa-circle-check"></i> Automated CRITICAL / WARNING Alerts</div>
+      <div class="feature-item"><i class="fas fa-circle-check"></i> Full Amortisation Schedules</div>
+      <div class="feature-item"><i class="fas fa-circle-check"></i> AWS-Deployed & Cloud-Native</div>
+      <div class="feature-item"><i class="fas fa-circle-check"></i> Secure PBKDF2 Authentication</div>
+      <div style="margin-top:28px; opacity:.4; font-size:.72rem;">
+        Cloud-Based EMI Failure Prevention Framework v1.0 • Final Year Project
+      </div>
+    </div>
+  </div>
+
+  <!-- Form Panel -->
+  <div class="login-form-side">
+    <h4>Welcome Back</h4>
+    <p class="sub">Sign in to access your EMI dashboard</p>
+
+    <!-- Tabs -->
+    <div class="d-flex mb-4">
+      <button class="tab-btn active" id="tab-login" onclick="switchTab('login')">Sign In</button>
+      <button class="tab-btn" id="tab-register" onclick="switchTab('register')">Register</button>
+    </div>
+
+    <!-- Login Form -->
+    <div id="form-login">
+      <div class="mb-3">
+        <label class="form-label">Email Address</label>
+        <div class="input-group">
+          <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+          <input type="email" id="login-email" class="form-control" placeholder="you@example.com"/>
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Password</label>
+        <div class="input-group">
+          <span class="input-group-text"><i class="fas fa-lock"></i></span>
+          <input type="password" id="login-password" class="form-control" placeholder="••••••••"/>
+        </div>
+      </div>
+      <div class="error-msg" id="login-error"></div>
+      <button class="btn-login mt-2" onclick="doLogin()">
+        <i class="fas fa-sign-in-alt me-2"></i>Sign In
+      </button>
+      <div class="mt-3 text-center" style="font-size:.75rem; color:#9ca3af;">
+        Demo: <strong>john.doe@example.com</strong> / <strong>password123</strong>
+      </div>
+    </div>
+
+    <!-- Register Form -->
+    <div id="form-register" style="display:none;">
+      <div class="row g-2">
+        <div class="col-12">
+          <label class="form-label">Full Name</label>
+          <input type="text" id="reg-name" class="form-control" placeholder="John Doe"/>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Email</label>
+          <input type="email" id="reg-email" class="form-control" placeholder="you@example.com"/>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Phone</label>
+          <input type="text" id="reg-phone" class="form-control" placeholder="9876543210"/>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Date of Birth</label>
+          <input type="date" id="reg-dob" class="form-control"/>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Address</label>
+          <input type="text" id="reg-address" class="form-control" placeholder="City, State"/>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Password</label>
+          <input type="password" id="reg-password" class="form-control" placeholder="Min. 8 characters"/>
+        </div>
+      </div>
+      <div class="error-msg" id="reg-error"></div>
+      <button class="btn-login mt-3" onclick="doRegister()">
+        <i class="fas fa-user-plus me-2"></i>Create Account
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  function switchTab(tab) {
+    document.getElementById('form-login').style.display    = tab === 'login'    ? '' : 'none';
+    document.getElementById('form-register').style.display = tab === 'register' ? '' : 'none';
+    document.getElementById('tab-login').classList.toggle('active',    tab === 'login');
+    document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+  }
+
+  async function doLogin() {
+    const email    = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+    const errEl    = document.getElementById('login-error');
+    errEl.style.display = 'none';
+
+    if (!email || !password) { errEl.textContent = 'Please fill in all fields.'; errEl.style.display='block'; return; }
+
+    const r = await fetch('/api/auth/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      credentials:'include', body: JSON.stringify({email, password})
+    });
+    const data = await r.json();
+    if (r.ok) { window.location.href = '/dashboard'; }
+    else { errEl.textContent = data.error || 'Login failed.'; errEl.style.display = 'block'; }
+  }
+
+  async function doRegister() {
+    const body  = {
+      full_name: document.getElementById('reg-name').value.trim(),
+      email    : document.getElementById('reg-email').value.trim(),
+      phone    : document.getElementById('reg-phone').value.trim(),
+      dob      : document.getElementById('reg-dob').value,
+      address  : document.getElementById('reg-address').value.trim(),
+      password : document.getElementById('reg-password').value
+    };
+    const errEl = document.getElementById('reg-error');
+    errEl.style.display = 'none';
+
+    const r = await fetch('/api/auth/register', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      credentials:'include', body: JSON.stringify(body)
+    });
+    const data = await r.json();
+    if (r.ok) { switchTab('login'); document.getElementById('login-email').value = body.email; }
+    else { errEl.textContent = data.error || 'Registration failed.'; errEl.style.display = 'block'; }
+  }
+
+  document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+# Cloud-Based EMI Failure Prevention Framework
+# Python Dependencies
+# Install: pip install -r requirements.txt
+
+# Core Framework
+Flask==3.0.3
+Flask-Cors==4.0.1
+
+# Database
+PyMySQL==1.1.1
+
+# Environment Management
+python-dotenv==1.0.1
+
+# Security / Password Hashing
+# (Using built-in hashlib – no extra package needed)
+
+# Production WSGI Server
+gunicorn==22.0.0
+
+# Monitoring & Logging
+watchtower==3.3.1          # AWS CloudWatch log handler
+
+# Optional: AWS SDK (for S3 backups, CloudWatch metrics, etc.)
+boto3==1.34.144
+
+# Development / Testing
+pytest==8.2.2
+pytest-flask==1.3.0
